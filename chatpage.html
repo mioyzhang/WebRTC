@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>wedrtc chat</title>
+    <style>
+        body{
+            background-color: blanchedalmond;
+            margin-top: 15px;
+            font-family: sans-serif;
+            color: white;
+        }
+        video{
+            background: black;
+            border: 1px solid white;
+        }
+        .page{
+            position: relative;
+            display: block;
+            margin: 0 auto;
+            width: 720px;
+            height: 480px;
+        }
+        #yours{
+            width:160px;
+            height:120px;
+            position:absolute;
+            top:15px;
+            right:15px
+        }
+        #theirs{
+            width:720px;
+            height:480px;
+        }
+    </style>
+</head>
+
+<body>
+<div id="call-page" class="page">
+    <video id="yours" autoplay></video>
+    <video id="theirs" autoplay></video>
+    <input type="text" id="their-username" />
+    <button id="call" onClick="lickcall()">call</button>
+    <button id="stop" onClick="linkstop()">end</button><br>
+</div>
+<script>
+    var yourPc = null;
+    var localstream = null;
+    var aims = null;
+    var form = null;
+    while (form == null) {
+        form = prompt("set your name");
+    }
+    var header = window.location.href.split('#')[0];
+    var serverip = (header.substring(7, header.length - 1));
+    var ws = new WebSocket("ws://" + serverip + "/?" + form);
+    // var ws = new WebSocket("ws://localhost:3002");
+    // var ws = new WebSocket("ws://172.16.122.130:3002/?" + form);
+    startConnection(); //创建PC
+
+    ws.onopen = function(){
+        console.log('连接打开');
+    };
+    ws.onmessage = function(message){
+        var data = JSON.parse(message.data);
+        console.log('onmessage', data.type);
+        switch(data.type){
+            case "login":
+                //登录处理事件
+                break;
+            case "offer":
+                onOffer(data);
+                //处理offer
+                break;
+            case "answer":
+                onAnswer(data);
+                //处理answer
+                break;
+            case "icecandidate":
+                onCandidate(data);
+                //处理候选者
+                break;
+            case 'error':
+                alert(data.data);
+                break;
+
+            default:
+                break;
+        }
+    };
+
+    function send(message) {
+        console.log('send' + message.type + ' from ' + message.from + ' to ' + message.to);
+        ws.send(JSON.stringify(message));
+    }
+
+    function canGetUserMediaUse(){
+        return !!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+    }
+
+    function startConnection(){
+        if(canGetUserMediaUse()){
+            navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+            navigator.getUserMedia({
+                video: true,
+                audio: true
+            }, function(stream) {
+                localstream = stream;
+                document.getElementById("yours").src = URL.createObjectURL(stream);
+                var config = {"iceServers":[{"url":"stun:stun.l.google.com:19302"}]};
+                yourPc = new RTCPeerConnection(config);
+                yourPc.addStream(stream);
+                yourPc.onaddstream = function(e){
+                    document.getElementById("theirs").src = URL.createObjectURL(e.stream);
+                };
+                //添加ice处理事件
+                yourPc.onicecandidate = function(e){
+                    if(e.candidate){
+                        send({
+                            type: 'icecandidate',
+                            from: form,
+                            to: aims,
+                            candidate: e.candidate
+                        });
+                    }
+                };
+            }, function(err) {
+                alert(err);
+            });
+        }else {
+            alert('你的浏览器不支持WebRTC');
+        }
+    }
+
+    function lickcall() {
+        aims = document.getElementById('their-username').value;
+        if (aims == ''){
+            alert('请输入连接对象的用户名');
+            return
+        }
+        //创建offer
+        yourPc.createOffer(function (desc) {
+            yourPc.setLocalDescription(desc);
+            send({
+                type: "offer",
+                from: form,
+                to: aims,
+                offer: desc
+            });
+        }, function (error) {
+            console.log('Failure callback: ' + error);
+        })
+    }
+
+    function onOffer(offer) {
+        aims = offer.from;
+        yourPc.setRemoteDescription(new RTCSessionDescription(offer.offer));
+        yourPc.createAnswer(function(desc) {
+            yourPc.setLocalDescription(desc);
+            send({
+                type: 'answer',
+                from: form,
+                to: aims,
+                answer: desc
+            });
+        }, function(error) {
+            alert(error);
+        });
+    }
+
+    function onAnswer(answer) {
+        yourPc.setRemoteDescription(new RTCSessionDescription(answer.answer));
+    }
+
+    function onCandidate(candiadate) {
+        yourPc.addIceCandidate(new RTCIceCandidate(candiadate.candidate));
+    }
+
+    function onLeave(){
+        document.getElementById("theirs").src = null;
+        //document.getElementById("yours").src = null;
+        yourPc.close();
+        yourPc.onicecandidate = null;
+        yourPc.onaddstream = null;
+    }
+
+    function linkstop(){
+        send({
+            type:"leave"
+        });
+        onLeave();
+    }
+</script>
+</body>
+</html>
