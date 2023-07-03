@@ -10,7 +10,7 @@ var url = require('url');
 var WebSocket = require('ws');
 
 app.get('/', function (req, res) {
-    res.sendfile(__dirname + '/chatpage.html');
+    res.sendFile(__dirname + '/chatpage.html');
 });
 server.listen(3002, function () {
     console.log('服务器开启：' + 3002);

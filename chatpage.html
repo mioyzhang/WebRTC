@@ -106,16 +106,14 @@
                 audio: true
             }, function(stream) {
                 localstream = stream;
-                // document.getElementById("yours").src = URL.createObjectURL(stream);
                 document.getElementById("yours").srcObject = stream;
                 document.getElementById("yours").play(); 
                 var config = {"iceServers":[{"url":"stun:stun.l.google.com:19302"}]};
                 yourPc = new RTCPeerConnection(config);
                 yourPc.addStream(stream);
                 yourPc.onaddstream = function(e){
-                    // document.getElementById("theirs").src = URL.createObjectURL(e.stream);
-                    document.getElementById("theirs").srcObject = stream;
-                    document.getElementById("theirs").play(); 
+                    document.getElementById("theirs").srcObject = e.stream;
+                    document.getElementById("theirs").play();
                 };
                 //添加ice处理事件
                 yourPc.onicecandidate = function(e){
@@ -137,7 +135,7 @@
     }
 
     function lickcall() {
-        aims = document.getElementById('their-username').value;
+        aims = document.getElementById('their-username').innerText;
         if (aims == ''){
             alert('请输入连接对象的用户名');
             return
@@ -186,6 +184,7 @@
         yourPc.close();
         yourPc.onicecandidate = null;
         yourPc.onaddstream = null;
+        yourPc = null;
     }
 
     function linkstop(){
