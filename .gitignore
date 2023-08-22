@@ -2,4 +2,4 @@ package.json
 package-lock.json
 
 .idea/
-node_modeles/
+node_modules/
